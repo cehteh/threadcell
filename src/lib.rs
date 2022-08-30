@@ -54,8 +54,8 @@ impl<T> ThreadCell<T> {
     ///
     /// # Panics
     ///
-    /// When the cell is owned by some other thread.
-    pub fn take_ownership(&self) {
+    /// When the cell is owned by another thread.
+    pub fn acquire(&self) {
         if !self.is_owned() {
             self.thread_id
                 .compare_exchange(0, ThreadId::current().as_u64(), Ordering::Acquire, Ordering::Relaxed)
@@ -65,8 +65,8 @@ impl<T> ThreadCell<T> {
 
     /// Tries to take the ownership of a cell. Returns true when the ownership could be
     /// obtained or the cell was already owned by the current thread and false when the cell
-    /// is owned by some other thread.
-    pub fn try_take_ownership(&self) -> bool {
+    /// is owned by another thread.
+    pub fn try_acquire(&self) -> bool {
         if self.is_owned() {
             true
         } else {
@@ -81,16 +81,16 @@ impl<T> ThreadCell<T> {
     /// # Panics
     ///
     /// When the cell is owned by another thread.
-    pub fn take_ownership_get(&self) -> &T {
-        self.take_ownership();
+    pub fn acquire_get(&self) -> &T {
+        self.acquire();
         // Safety: we have it
         unsafe { self.get_unchecked() }
     }
 
     /// Tries to take the ownership of a cell and returns a reference to its value.
     /// Will return 'None' when the cell is owned by another thread.
-    pub fn try_take_ownership_get(&self) -> Option<&T> {
-        if self.try_take_ownership() {
+    pub fn try_acquire_get(&self) -> Option<&T> {
+        if self.try_acquire() {
             // Safety: we have it
             Some(unsafe { self.get_unchecked() })
         } else {
@@ -103,16 +103,16 @@ impl<T> ThreadCell<T> {
     /// # Panics
     ///
     /// When the cell is owned by another thread.
-    pub fn take_ownership_get_mut(&mut self) -> &mut T {
-        self.take_ownership();
+    pub fn acquire_get_mut(&mut self) -> &mut T {
+        self.acquire();
         // Safety: we have it
         unsafe { self.get_mut_unchecked() }
     }
 
     /// Tries to take the ownership of a cell and returns a mutable reference to its value.
     /// Will return 'None' when the cell is owned by another thread.
-    pub fn try_take_ownership_get_mut(&mut self) -> Option<&mut T> {
-        if self.try_take_ownership() {
+    pub fn try_acquire_get_mut(&mut self) -> Option<&mut T> {
+        if self.try_acquire() {
             // Safety: we have it
             Some(unsafe { self.get_mut_unchecked() })
         } else {
@@ -125,7 +125,7 @@ impl<T> ThreadCell<T> {
     /// # Panics
     ///
     /// The current thread does not own the cell.
-    pub fn disown(&self) {
+    pub fn release(&self) {
         self.thread_id
             .compare_exchange(ThreadId::current().as_u64(), 0, Ordering::Release, Ordering::Relaxed)
             .expect("Thread has no access to ThreadCell");
