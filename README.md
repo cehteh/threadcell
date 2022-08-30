@@ -1,5 +1,5 @@
 A cell whose value can only be accessed by a owning thread.
-Much like a Mutex but without blocking locks.
+Much like a Mutex but without blocking locks and guards.
 
 
 # Semantics
@@ -18,9 +18,9 @@ Threads that do not own a ThreadCell and access its value will panic.  There are
 variants in the API that will not panic but return a bool or Option instead.
 
 
-# Use Case
+# Use Cases
 
- * Single threaded applications that need a static mutable global variable as
+ * Single threaded applications that need a static mutable global variable can use
    `ThreadCell<RefCell<T>>`.
  * Sharing data between threads where synchronizaton is done out of band with other
    syncronization primitives.

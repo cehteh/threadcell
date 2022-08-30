@@ -27,4 +27,6 @@ static GLOBAL: ThreadCell<RefCell<u64>> = ThreadCell::new_disowned(RefCell::new(
 fn access_global() {
     GLOBAL.acquire();
     assert_eq!(*GLOBAL.get().borrow(), 345);
+    *GLOBAL.get().borrow_mut() = 456;
+    assert_eq!(*GLOBAL.get().borrow(), 456);
 }

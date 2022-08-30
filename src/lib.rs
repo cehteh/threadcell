@@ -20,15 +20,15 @@ pub struct ThreadCell<T> {
 
 /// # Safety
 ///
-/// This type is meant for sending values to other threads.
-//#[allow(clippy::non_send_fields_in_send_ty)]
+/// This type is meant for sending values that are !Send to other threads.
+#[allow(clippy::non_send_fields_in_send_ty)]
 unsafe impl<T> Send for ThreadCell<T> {}
 
 /// # Safety
 ///
-/// Only the owning thread can access the value or release ownership. But the `ThreadCell`
-/// itself can be shared between threads (for taking a disowned cell etc). Ownership handling
-/// done by atomic primitives.
+/// Only the owning thread can access the value or release ownership. The `ThreadCell` itself
+/// can be shared between threads (for acquiring ownership etc). Ownership handling done by
+/// atomic primitives.
 unsafe impl<T> Sync for ThreadCell<T> {}
 
 impl<T> ThreadCell<T> {
@@ -205,7 +205,7 @@ impl<T> ThreadCell<T> {
     /// This is always safe when the thread owns the cell, for example right after a
     /// `get_ownership()` call.  When the current thread does not own the cell then it is only
     /// safe when T is a Sync type.
-    // TODO: eventually, if possible implement a 'fn is_sync<T>() -> bool' and debug_assert on this
+    // PLANNED: When specialization is available: 'fn is_sync<T>() -> bool' and debug_assert!(is_owned() || is_sync::<T>())
     #[inline]
     pub unsafe fn get_unchecked(&self) -> &T {
         &self.data
@@ -218,7 +218,7 @@ impl<T> ThreadCell<T> {
     /// This is always safe when the thread owns the cell, for example right after a
     /// `get_ownership()` call.  When the current thread does not own the cell then it is only
     /// safe when T is a Sync type.
-    // TODO: eventually, if possible implement a 'fn is_sync<T>() -> bool' and debug_assert on this
+    // PLANNED: When specialization is available: 'fn is_sync<T>() -> bool' and debug_assert!(is_owned() || is_sync::<T>())
     #[inline]
     pub unsafe fn get_mut_unchecked(&mut self) -> &mut T {
         &mut self.data
