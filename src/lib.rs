@@ -76,6 +76,50 @@ impl<T> ThreadCell<T> {
         }
     }
 
+    /// Takes the ownership of a cell and returns a reference to its value.
+    ///
+    /// # Panics
+    ///
+    /// When the cell is owned by another thread.
+    pub fn take_ownership_get(&self) -> &T {
+        self.take_ownership();
+        // Safety: we have it
+        unsafe { self.get_unchecked() }
+    }
+
+    /// Tries to take the ownership of a cell and returns a reference to its value.
+    /// Will return 'None' when the cell is owned by another thread.
+    pub fn try_take_ownership_get(&self) -> Option<&T> {
+        if self.try_take_ownership() {
+            // Safety: we have it
+            Some(unsafe { self.get_unchecked() })
+        } else {
+            None
+        }
+    }
+
+    /// Takes the ownership of a cell and returns a mutable reference to its value.
+    ///
+    /// # Panics
+    ///
+    /// When the cell is owned by another thread.
+    pub fn take_ownership_get_mut(&mut self) -> &mut T {
+        self.take_ownership();
+        // Safety: we have it
+        unsafe { self.get_mut_unchecked() }
+    }
+
+    /// Tries to take the ownership of a cell and returns a mutable reference to its value.
+    /// Will return 'None' when the cell is owned by another thread.
+    pub fn try_take_ownership_get_mut(&mut self) -> Option<&mut T> {
+        if self.try_take_ownership() {
+            // Safety: we have it
+            Some(unsafe { self.get_mut_unchecked() })
+        } else {
+            None
+        }
+    }
+
     /// Sets a `ThreadCell` which is owned by the current thread into the disowned state.
     ///
     /// # Panics
