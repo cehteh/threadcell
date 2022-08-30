@@ -149,9 +149,9 @@ impl<T> ThreadCell<T> {
     ///
     /// The current thread does not own the cell.
     #[inline]
-    pub fn into_inner(self) -> T {
+    pub fn into_inner(mut self) -> T {
         self.assert_owned();
-        todo!()
+        unsafe { ManuallyDrop::take(&mut self.data) }
     }
 
     /// Gets an immutable reference to the cells content.
