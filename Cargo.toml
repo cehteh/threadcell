@@ -1,0 +1,12 @@
+[package]
+name = "threadcell"
+version = "0.1.0"
+edition = "2021"
+authors = ["Christian Thäter <ct@pipapo.org>"]
+description = "A cell whose value can only be accessed by a owning thread"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/cehteh/threadcell.git"
+keywords = ["cell"]
+categories = ["concurrency"]
+
+[dependencies]
