@@ -49,22 +49,6 @@ impl<T> ThreadCell<T> {
         }
     }
 
-    /// Takes the ownership of a cell unconditionally. This is a no-op when the cell is
-    /// already owned by the current thread.
-    ///
-    /// # Safety
-    ///
-    /// This method does not check if the cell is owned by another thread. The owning thread
-    /// may operate on the content, thus a data race may happen when the accessed value is not
-    /// Sync. The previous owning thread may panic because it expects owning the cell. The
-    /// only safe way to use this method is to recover a cell that is owned by a thread that
-    /// finished without releasing it (e.g after a panic).
-    pub unsafe fn steal(&self) {
-        if !self.is_owned() {
-            self.thread_id.store(ThreadId::current().as_u64(), Ordering::SeqCst);
-        }
-    }
-
     /// Takes the ownership of a cell. This is a no-op when the cell is already owned by the
     /// current thread.
     ///
@@ -133,6 +117,22 @@ impl<T> ThreadCell<T> {
             Some(unsafe { self.get_mut_unchecked() })
         } else {
             None
+        }
+    }
+
+    /// Takes the ownership of a cell unconditionally. This is a no-op when the cell is
+    /// already owned by the current thread.
+    ///
+    /// # Safety
+    ///
+    /// This method does not check if the cell is owned by another thread. The owning thread
+    /// may operate on the content, thus a data race/UB will happen when the accessed value is
+    /// not Sync. The previous owning thread may panic when it expects owning the cell. The
+    /// only safe way to use this method is to recover a cell that is owned by a thread that
+    /// finished without releasing it (e.g after a panic).
+    pub unsafe fn steal(&self) {
+        if !self.is_owned() {
+            self.thread_id.store(ThreadId::current().as_u64(), Ordering::SeqCst);
         }
     }
 

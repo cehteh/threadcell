@@ -1,5 +1,5 @@
-A cell whose value can only be accessed by a owning thread.
-Much like a Mutex but without blocking locks and guards.
+A cell whose value can only be accessed by a owning thread.  Much like a Mutex but without
+blocking locks and guards. Access to ThreadCells is passed cooperatively between threads.
 
 
 # Semantics
@@ -24,4 +24,3 @@ variants in the API that will not panic but return a bool or Option instead.
    `ThreadCell<RefCell<T>>`.
  * Sharing data between threads where synchronizaton is done out of band with other
    syncronization primitives.
-
