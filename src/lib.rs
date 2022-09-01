@@ -147,6 +147,15 @@ impl<T> ThreadCell<T> {
             .expect("Thread has no access to ThreadCell");
     }
 
+    /// Tries to set a `ThreadCell` which is owned by the current thread into the disowned
+    /// state. Returns *true* on success and *false* when the current thread does not own the
+    /// cell.
+    pub fn try_release(&self) -> bool {
+        self.thread_id
+            .compare_exchange(ThreadId::current().as_u64(), 0, Ordering::Release, Ordering::Relaxed)
+            .is_ok()
+    }
+
     /// Returns true when the current thread owns this cell.
     #[inline(always)]
     pub fn is_owned(&self) -> bool {
