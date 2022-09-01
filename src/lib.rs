@@ -121,7 +121,8 @@ impl<T> ThreadCell<T> {
     }
 
     /// Takes the ownership of a cell unconditionally. This is a no-op when the cell is
-    /// already owned by the current thread.
+    /// already owned by the current thread. Returns 'self' thus it can be chained with
+    /// `.release()`.
     ///
     /// # Safety
     ///
@@ -130,10 +131,11 @@ impl<T> ThreadCell<T> {
     /// not Sync. The previous owning thread may panic when it expects owning the cell. The
     /// only safe way to use this method is to recover a cell that is owned by a thread that
     /// finished without releasing it (e.g after a panic).
-    pub unsafe fn steal(&self) {
+    pub unsafe fn steal(&self) -> &Self {
         if !self.is_owned() {
             self.thread_id.store(ThreadId::current().as_u64(), Ordering::SeqCst);
         }
+        self
     }
 
     /// Sets a `ThreadCell` which is owned by the current thread into the disowned state.
@@ -422,5 +424,16 @@ mod tests {
     fn smoke() {
         let _owned = ThreadCell::new_owned(123);
         let _disowned = ThreadCell::new_disowned(234);
+    }
+
+    #[test]
+    fn threadid() {
+        let main = ThreadId::current().as_u64();
+        let child = std::thread::spawn(|| ThreadId::current().as_u64()).join().unwrap();
+
+        // just info, actual values are unspecified
+        println!("{main}, {child}");
+
+        assert_ne!(main, child);
     }
 }
