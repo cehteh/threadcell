@@ -49,7 +49,12 @@ impl<T> ThreadCell<T> {
     pub fn acquire(&self) {
         if !self.is_owned() {
             self.thread_id
-                .compare_exchange(0, ThreadId::current().as_u64(), Ordering::Acquire, Ordering::Relaxed)
+                .compare_exchange(
+                    0,
+                    ThreadId::current().as_u64(),
+                    Ordering::Acquire,
+                    Ordering::Relaxed,
+                )
                 .expect("Thread has no access to ThreadCell");
         }
     }
@@ -62,7 +67,12 @@ impl<T> ThreadCell<T> {
             true
         } else {
             self.thread_id
-                .compare_exchange(0, ThreadId::current().as_u64(), Ordering::Acquire, Ordering::Relaxed)
+                .compare_exchange(
+                    0,
+                    ThreadId::current().as_u64(),
+                    Ordering::Acquire,
+                    Ordering::Relaxed,
+                )
                 .is_ok()
         }
     }
@@ -124,7 +134,8 @@ impl<T> ThreadCell<T> {
     /// finished without releasing it (e.g after a panic).
     pub unsafe fn steal(&self) -> &Self {
         if !self.is_owned() {
-            self.thread_id.store(ThreadId::current().as_u64(), Ordering::SeqCst);
+            self.thread_id
+                .store(ThreadId::current().as_u64(), Ordering::SeqCst);
         }
         self
     }
@@ -136,7 +147,12 @@ impl<T> ThreadCell<T> {
     /// The current thread does not own the cell.
     pub fn release(&self) {
         self.thread_id
-            .compare_exchange(ThreadId::current().as_u64(), 0, Ordering::Release, Ordering::Relaxed)
+            .compare_exchange(
+                ThreadId::current().as_u64(),
+                0,
+                Ordering::Release,
+                Ordering::Relaxed,
+            )
             .expect("Thread has no access to ThreadCell");
     }
 
@@ -145,7 +161,12 @@ impl<T> ThreadCell<T> {
     /// cell.
     pub fn try_release(&self) -> bool {
         self.thread_id
-            .compare_exchange(ThreadId::current().as_u64(), 0, Ordering::Release, Ordering::Relaxed)
+            .compare_exchange(
+                ThreadId::current().as_u64(),
+                0,
+                Ordering::Release,
+                Ordering::Relaxed,
+            )
             .is_ok()
     }
 
@@ -420,7 +441,9 @@ mod tests {
     #[test]
     fn threadid() {
         let main = ThreadId::current().as_u64();
-        let child = std::thread::spawn(|| ThreadId::current().as_u64()).join().unwrap();
+        let child = std::thread::spawn(|| ThreadId::current().as_u64())
+            .join()
+            .unwrap();
 
         // just info, actual values are unspecified
         println!("{main}, {child}");
