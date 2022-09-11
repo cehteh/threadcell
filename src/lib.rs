@@ -18,18 +18,9 @@ pub struct ThreadCell<T> {
     thread_id: AtomicU64,
 }
 
-/// # Safety
-///
-/// This type is meant for sending values that are !Send to other threads.
 #[allow(clippy::non_send_fields_in_send_ty)]
-unsafe impl<T> Send for ThreadCell<T> {}
-
-/// # Safety
-///
-/// Only the owning thread can access the value or release ownership. The `ThreadCell` itself
-/// can be shared between threads (for acquiring ownership etc). Ownership handling done by
-/// atomic primitives.
-unsafe impl<T> Sync for ThreadCell<T> {}
+unsafe impl<T: Send> Send for ThreadCell<T> {}
+unsafe impl<T: Send> Sync for ThreadCell<T> {}
 
 impl<T> ThreadCell<T> {
     /// Creates a `ThreadCell` that is not owned by any thread. This is a const fn which
