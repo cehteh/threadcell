@@ -1,8 +1,10 @@
 A cell whose value can only be accessed by a owning thread.  Much like a Mutex but without
-blocking locks and guards. Access to ThreadCells is passed cooperatively between threads.
+blocking locks. Access to ThreadCells is passed cooperatively between threads.
 
 
 # Semantics
+
+## ThreadCell
 
 A ThreadCell and references therof can always be send to other threads
 
@@ -17,6 +19,11 @@ A ThreadCell and references therof can always be send to other threads
 Threads that do not own a ThreadCell and access its value will panic.  There are 'try_*'
 variants in the API that will not panic but return a bool or Option instead.
 
+## Guard
+
+`threadcell::Guard` is optional and (only) handle proper cleanup when it becomes
+dropped. Unlike MutexGuards they are explicitly constructed and may not hold the threads
+ownership of the referenced ThreadCell.
 
 # Use Cases
 
