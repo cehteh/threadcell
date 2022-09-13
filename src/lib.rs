@@ -131,7 +131,8 @@ impl<T> ThreadCell<T> {
     /// may operate on the content, thus a data race/UB will happen when the accessed value is
     /// not Sync. The previous owning thread may panic when it expects owning the cell. The
     /// only safe way to use this method is to recover a cell that is owned by a thread that
-    /// finished without releasing it (e.g after a panic).
+    /// finished without releasing it (e.g after a panic). Attention should be paid to the
+    /// fact that the value protected by the `ThreadCell` might be in a undefined state.
     pub unsafe fn steal(&self) -> &Self {
         if !self.is_owned() {
             self.thread_id
@@ -428,6 +429,44 @@ impl ThreadId {
     }
 }
 
+/// Guards that a referenced `ThreadCell` becomes properly released when its guard becomes
+/// dropped. This should cover most panics that do not end in an `abort()` as well. There are
+/// some cases where panics can escape this, for example when one registers custom panic
+/// handlers.
+struct Guard<'a, T>(&'a ThreadCell<T>);
+
+impl<'a, T> Guard<'a, T> {
+    /// Creates a `Guard` that does not acquire the supplied `ThreadCell`.
+    pub const fn new(tc: &'a ThreadCell<T>) -> Self {
+        Self(tc)
+    }
+
+    /// Acquires the supplied `ThreadCell` and creates a `Guard` referring to it.
+    ///
+    /// # Panics
+    ///
+    /// When the cell is owned by another thread.
+    pub fn acquire(tc: &'a ThreadCell<T>) -> Self {
+        tc.acquire();
+        Self(tc)
+    }
+}
+
+impl<T> Guard<'_, T> {
+    /// Returns a reference to the underlying `ThreadCell`.
+    #[inline]
+    pub fn inner(&self) -> &ThreadCell<T> {
+        self.0
+    }
+}
+
+/// Releases the referenced `ThreadCell` when it is owned by the current thread.
+impl<T> Drop for Guard<'_, T> {
+    fn drop(&mut self) {
+        self.inner().try_release();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -449,5 +488,35 @@ mod tests {
         println!("{main}, {child}");
 
         assert_ne!(main, child);
+    }
+
+    #[test]
+    fn guard() {
+        static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
+
+        let guard = Guard::new(&DISOWNED);
+
+        let _child = std::thread::spawn(|| {
+            let _guard = Guard::acquire(&DISOWNED);
+        })
+        .join()
+        .unwrap();
+
+        guard.inner().acquire();
+    }
+
+    #[test]
+    #[should_panic]
+    fn guard_panic() {
+        static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
+
+        let guard = Guard::new(&DISOWNED);
+        guard.inner().acquire();
+
+        let _child = std::thread::spawn(|| {
+            let _guard = Guard::acquire(&DISOWNED);
+        })
+        .join()
+        .unwrap();
     }
 }
