@@ -433,7 +433,7 @@ impl ThreadId {
 /// dropped. This should cover most panics that do not end in an `abort()` as well. There are
 /// some cases where panics can escape this, for example when one registers custom panic
 /// handlers.
-struct Guard<'a, T>(&'a ThreadCell<T>);
+pub struct Guard<'a, T>(&'a ThreadCell<T>);
 
 impl<'a, T> Guard<'a, T> {
     /// Creates a `Guard` that does not acquire the supplied `ThreadCell`.
