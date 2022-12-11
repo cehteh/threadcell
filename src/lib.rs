@@ -242,9 +242,9 @@ impl<T> ThreadCell<T> {
     ///
     /// # Safety
     ///
-    /// This is always safe when the thread owns the cell, for example right after a
-    /// `get_ownership()` call.  When the current thread does not own the cell then it is only
-    /// safe when T is a Sync type.
+    /// This is always safe when the thread owns the cell, for example after a `acquire()`
+    /// call.  When the current thread does not own the cell then it is only safe when T is a
+    /// Sync type.
     // PLANNED: When specialization is available: 'fn is_sync<T>() -> bool' and debug_assert!(is_owned() || is_sync::<T>())
     #[inline]
     pub unsafe fn get_unchecked(&self) -> &T {
@@ -255,9 +255,9 @@ impl<T> ThreadCell<T> {
     ///
     /// # Safety
     ///
-    /// This is always safe when the thread owns the cell, for example right after a
-    /// `get_ownership()` call.  When the current thread does not own the cell then it is only
-    /// safe when T is a Sync type.
+    /// This is always safe when the thread owns the cell, for example after a `acquire()`
+    /// call.  When the current thread does not own the cell then it is only safe when T is a
+    /// Sync type.
     // PLANNED: When specialization is available: 'fn is_sync<T>() -> bool' and debug_assert!(is_owned() || is_sync::<T>())
     #[inline]
     pub unsafe fn get_mut_unchecked(&mut self) -> &mut T {
