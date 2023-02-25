@@ -122,6 +122,40 @@ impl<T> ThreadCell<T> {
         }
     }
 
+    /// Acquires a `ThreadCell` returning a `Guard` that releases it when becoming dropped.
+    ///
+    /// # Panics
+    ///
+    /// When the cell is owned by another thread.
+    #[inline]
+    pub fn acquire_guard(&self) -> Guard<T> {
+        Guard::acquire(self)
+    }
+
+    /// Acquires a `ThreadCell` returning a `Option<Guard>` that releases it when becoming
+    /// dropped.  Returns `None` when self is owned by another thread.
+    #[inline]
+    pub fn try_acquire_guard(&self) -> Option<Guard<T>> {
+        Guard::try_acquire(self)
+    }
+
+    /// Acquires a `ThreadCell` returning a `GuardMut` that releases it when becoming dropped.
+    ///
+    /// # Panics
+    ///
+    /// When the cell is owned by another thread.
+    #[inline]
+    pub fn acquire_guard_mut(&mut self) -> GuardMut<T> {
+        GuardMut::acquire(self)
+    }
+
+    /// Acquires a `ThreadCell` returning a `Option<GuardMut>` that releases it when becoming
+    /// dropped.  Returns `None` when self is owned by another thread.
+    #[inline]
+    pub fn try_acquire_guard_mut(&mut self) -> Option<GuardMut<T>> {
+        GuardMut::try_acquire(self)
+    }
+
     /// Takes the ownership of a cell unconditionally. This is a no-op when the cell is
     /// already owned by the current thread. Returns 'self' thus it can be chained with
     /// `.release()`.
