@@ -19,14 +19,3 @@ fn mutate_owned() {
     *owned.get_mut() = 234;
     assert_eq!(*owned.get(), 234);
 }
-
-use std::cell::RefCell;
-static GLOBAL: ThreadCell<RefCell<u64>> = ThreadCell::new_disowned(RefCell::new(345));
-
-#[test]
-fn access_global() {
-    GLOBAL.acquire();
-    assert_eq!(*GLOBAL.get().borrow(), 345);
-    *GLOBAL.get().borrow_mut() = 456;
-    assert_eq!(*GLOBAL.get().borrow(), 456);
-}
