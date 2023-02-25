@@ -9,7 +9,7 @@
 
 use std::mem::ManuallyDrop;
 use std::num::NonZeroU64;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{cmp, fmt, mem};
 
@@ -483,6 +483,63 @@ impl<T> Deref for Guard<'_, T> {
     }
 }
 
+/// Mutable Guard that ensures that a referenced `ThreadCell` becomes properly released when
+/// it becomes dropped. This should cover most panics that do not end in an `abort()` as
+/// well. There are some cases where panics can escape this, for example when one registers
+/// custom panic handlers. Guards do not prevent the explicit release of a `ThreadCell`. Deref
+/// a `GuardMut` referencing a released `ThreadCell` will panic!
+#[repr(transparent)]
+pub struct GuardMut<'a, T>(&'a mut ThreadCell<T>);
+
+impl<'a, T> GuardMut<'a, T> {
+    /// Acquires the supplied `ThreadCell` and creates a `GuardMut` referring to it.
+    ///
+    /// # Panics
+    ///
+    /// When the cell is owned by another thread.
+    pub fn acquire(tc: &'a mut ThreadCell<T>) -> Self {
+        tc.acquire();
+        Self(tc)
+    }
+
+    /// Tries to acquire the supplied `ThreadCell` and creates a `GuardMut` referring to it. Will
+    /// return `None` when the acquisition failed.
+    pub fn try_acquire(tc: &'a mut ThreadCell<T>) -> Option<Self> {
+        if tc.try_acquire() {
+            Some(Self(tc))
+        } else {
+            None
+        }
+    }
+}
+
+/// Releases the referenced `ThreadCell` when it is owned by the current thread.
+impl<T> Drop for GuardMut<'_, T> {
+    fn drop(&mut self) {
+        self.0.try_release();
+    }
+}
+
+/// One can deref a `GuardMut` as long the `ThreadCell` is owned by the current thread this
+/// should be the case as long the guarded `ThreadCell` got not explicitly released or stolen.
+///
+/// # Panics
+///
+/// When the underlying `ThreadCell` is not owned by the current thread.
+impl<T> Deref for GuardMut<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.get()
+    }
+}
+
+impl<T> DerefMut for GuardMut<'_, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.get_mut()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -544,6 +601,23 @@ mod tests {
         std::thread::spawn(|| {
             let guard = Guard::acquire(&DISOWNED);
             assert_eq!(*guard, 234);
+        })
+        .join()
+        .unwrap();
+    }
+
+    #[test]
+    fn guard_mut() {
+        static mut DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
+
+        let mut guard = unsafe { GuardMut::acquire(&mut DISOWNED) };
+        assert_eq!(*guard, 234);
+        *guard = 345;
+        drop(guard);
+
+        std::thread::spawn(|| {
+            let guard = unsafe { Guard::acquire(&DISOWNED) };
+            assert_eq!(*guard, 345);
         })
         .join()
         .unwrap();
