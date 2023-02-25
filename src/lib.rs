@@ -176,15 +176,15 @@ impl<T> ThreadCell<T> {
 
     /// Tries to run a closure on a `ThreadCell` with acquire/release.  Returns `Some(Result)`
     /// when the cell could be acquired and None when it is owned by another thread.
-    pub fn try_with<R, F: FnOnce(&T) -> Option<R>>(&self, f: F) -> Option<R> {
-        f(&*self.try_acquire_guard()?)
+    pub fn try_with<R, F: FnOnce(&T) -> R>(&self, f: F) -> Option<R> {
+        Some(f(&*self.try_acquire_guard()?))
     }
 
     /// Tries to run a closure on a mutable `ThreadCell` with acquire/release.  Returns
     /// `Some(Result)` when the cell could be acquired and None when it is owned by another
     /// thread.
-    pub fn try_with_mut<R, F: FnOnce(&mut T) -> Option<R>>(&mut self, f: F) -> Option<R> {
-        f(&mut *self.try_acquire_guard_mut()?)
+    pub fn try_with_mut<R, F: FnOnce(&mut T) -> R>(&mut self, f: F) -> Option<R> {
+        Some(f(&mut *self.try_acquire_guard_mut()?))
     }
 
     /// Takes the ownership of a cell unconditionally. This is a no-op when the cell is
