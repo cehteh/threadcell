@@ -28,5 +28,7 @@ dropped. Unlike MutexGuards they are explicitly constructed.
 
  * Single threaded applications that need a static mutable global variable can use
    `ThreadCell<RefCell<T>>`.
+ * A `static mut ThreadCell<T>` will need some unsafe code but is actually safe because
+   `ThreadCell` guards against concurrent access.
  * Sharing data between threads where synchronizaton is done out of band with other
    syncronization primitives.

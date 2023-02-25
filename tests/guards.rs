@@ -59,3 +59,19 @@ fn guard_mut() {
     .join()
     .unwrap();
 }
+
+#[test]
+fn try_acquire_guard() {
+    let threadcell: ThreadCell<i32> = ThreadCell::default();
+
+    let guard = threadcell.try_acquire_guard().expect("Some(Guard)");
+    assert_eq!(*guard, i32::default());
+}
+
+#[test]
+fn try_acquire_guard_mut() {
+    let mut threadcell: ThreadCell<i32> = ThreadCell::default();
+
+    *threadcell.try_acquire_guard_mut().expect("Some(Guard)") = 234;
+    assert_eq!(*threadcell.acquire_get(), 234);
+}

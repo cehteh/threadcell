@@ -337,6 +337,7 @@ impl<T> ThreadCell<T> {
 /// # Panics
 ///
 /// Another thread owns the cell.
+#[mutants::skip]
 impl<T> Drop for ThreadCell<T> {
     // In debug builds we check first for ownership since dropping cells whose types do not
     // need dropping would still be a violation.
@@ -401,6 +402,7 @@ impl<T: Default> Default for ThreadCell<T> {
 /// # Panics
 ///
 /// Either cell is not owned by the current thread.
+#[mutants::skip]
 impl<T: PartialEq> PartialEq for ThreadCell<T> {
     #[inline]
     fn eq(&self, other: &ThreadCell<T>) -> bool {
@@ -415,6 +417,7 @@ impl<T: Eq> Eq for ThreadCell<T> {}
 /// # Panics
 ///
 /// Either cell is not owned by the current thread.
+#[mutants::skip]
 impl<T: PartialOrd> PartialOrd for ThreadCell<T> {
     #[inline]
     fn partial_cmp(&self, other: &ThreadCell<T>) -> Option<cmp::Ordering> {
@@ -447,6 +450,7 @@ impl<T: PartialOrd> PartialOrd for ThreadCell<T> {
 /// # Panics
 ///
 /// Either cell is not owned by the current thread.
+#[mutants::skip]
 impl<T: Ord> Ord for ThreadCell<T> {
     #[inline]
     fn cmp(&self, other: &ThreadCell<T>) -> cmp::Ordering {
@@ -459,6 +463,7 @@ impl<T: Ord> Ord for ThreadCell<T> {
 /// # Panics
 ///
 /// The cell is not owned by the current thread.
+#[mutants::skip]
 impl<T: fmt::Display> fmt::Display for ThreadCell<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         fmt::Display::fmt(self.get(), f)
@@ -466,6 +471,7 @@ impl<T: fmt::Display> fmt::Display for ThreadCell<T> {
 }
 
 #[allow(clippy::doc_markdown)]
+#[mutants::skip]
 /// Debug information of a `ThreadCell`.
 /// Prints "\<ThreadCell\>" when the current thread does not own the cell.
 impl<T: fmt::Debug> fmt::Debug for ThreadCell<T> {

@@ -25,3 +25,53 @@ fn mutate_owned() {
     *owned.get_mut() = 234;
     assert_eq!(*owned.get(), 234);
 }
+
+#[test]
+fn release() {
+    let threadcell = ThreadCell::new_owned(());
+    threadcell.release();
+    assert!(!threadcell.is_owned());
+}
+
+#[test]
+fn try_with() {
+    let threadcell = ThreadCell::new_disowned(234);
+    threadcell
+        .try_with(|v| assert_eq!(*v, 234))
+        .expect("Acquired");
+}
+
+#[test]
+fn try_with_mut() {
+    let mut threadcell = ThreadCell::new_disowned(234);
+    threadcell.try_with_mut(|v| *v = 345).expect("Acquired");
+    threadcell
+        .try_with(|v| assert_eq!(*v, 345))
+        .expect("Acquired");
+}
+
+#[test]
+fn try_get() {
+    let threadcell = ThreadCell::new_owned(234);
+    assert_eq!(*threadcell.try_get().expect("Acquired"), 234);
+}
+
+#[test]
+fn try_acquire_get() {
+    let threadcell = ThreadCell::new_disowned(234);
+    assert_eq!(*threadcell.try_acquire_get().expect("Acquired"), 234);
+}
+
+#[test]
+fn try_get_mut() {
+    let mut threadcell = ThreadCell::new_owned(234);
+    *threadcell.try_get_mut().expect("Acquired") = 345;
+    assert_eq!(*threadcell.get(), 345);
+}
+
+#[test]
+fn try_acquire_get_mut() {
+    let mut threadcell = ThreadCell::new_disowned(234);
+    *threadcell.try_acquire_get_mut().expect("Acquired") = 345;
+    assert_eq!(*threadcell.get(), 345);
+}
