@@ -338,7 +338,7 @@ impl<T> ThreadCell<T> {
 /// Another thread owns the cell.
 impl<T> Drop for ThreadCell<T> {
     // In debug builds we check first for ownership since dropping cells whose types do not
-    // need dropping would be still a violation.
+    // need dropping would still be a violation.
     #[cfg(debug_assertions)]
     fn drop(&mut self) {
         let owner = self.thread_id.load(Ordering::Relaxed);
@@ -464,13 +464,14 @@ impl<T: fmt::Display> fmt::Display for ThreadCell<T> {
     }
 }
 
+#[allow(clippy::doc_markdown)]
 /// Debug information of a `ThreadCell`.
-/// Prints "\<invalid thread\>" when the current thread does not own the cell.
+/// Prints "\<ThreadCell\>" when the current thread does not own the cell.
 impl<T: fmt::Debug> fmt::Debug for ThreadCell<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self.try_get() {
             Some(data) => f.debug_struct("ThreadCell").field("data", data).finish(),
-            None => f.write_str("<invalid thread>"),
+            None => f.write_str("<ThreadCell>"),
         }
     }
 }
