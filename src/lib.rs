@@ -156,6 +156,37 @@ impl<T> ThreadCell<T> {
         GuardMut::try_acquire(self)
     }
 
+    /// Runs a closure on a `ThreadCell` with acquire/release.
+    ///
+    /// # Panics
+    ///
+    /// When the cell is owned by another thread.
+    pub fn with<R, F: FnOnce(&T) -> R>(&self, f: F) -> R {
+        f(&*self.acquire_guard())
+    }
+
+    /// Runs a closure on a mutable `ThreadCell` with acquire/release.
+    ///
+    /// # Panics
+    ///
+    /// When the cell is owned by another thread.
+    pub fn with_mut<R, F: FnOnce(&mut T) -> R>(&mut self, f: F) -> R {
+        f(&mut *self.acquire_guard_mut())
+    }
+
+    /// Tries to run a closure on a `ThreadCell` with acquire/release.  Returns `Some(Result)`
+    /// when the cell could be acquired and None when it is owned by another thread.
+    pub fn try_with<R, F: FnOnce(&T) -> Option<R>>(&self, f: F) -> Option<R> {
+        f(&*self.try_acquire_guard()?)
+    }
+
+    /// Tries to run a closure on a mutable `ThreadCell` with acquire/release.  Returns
+    /// `Some(Result)` when the cell could be acquired and None when it is owned by another
+    /// thread.
+    pub fn try_with_mut<R, F: FnOnce(&mut T) -> Option<R>>(&mut self, f: F) -> Option<R> {
+        f(&mut *self.try_acquire_guard_mut()?)
+    }
+
     /// Takes the ownership of a cell unconditionally. This is a no-op when the cell is
     /// already owned by the current thread. Returns 'self' thus it can be chained with
     /// `.release()`.
