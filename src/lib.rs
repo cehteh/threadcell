@@ -9,6 +9,7 @@
 
 use std::mem::ManuallyDrop;
 use std::num::NonZeroU64;
+use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{cmp, fmt, mem};
 
@@ -415,6 +416,7 @@ struct ThreadId(NonZeroU64);
 // PLANNED: nightly impl (std::thread::ThreadId)
 impl ThreadId {
     #[inline]
+    #[must_use]
     fn current() -> ThreadId {
         thread_local!(static THREAD_ID: NonZeroU64 = {
             static COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -424,6 +426,7 @@ impl ThreadId {
     }
 
     #[inline(always)]
+    #[must_use]
     fn as_u64(&self) -> u64 {
         self.0.get()
     }
@@ -432,15 +435,12 @@ impl ThreadId {
 /// Guards that a referenced `ThreadCell` becomes properly released when its guard becomes
 /// dropped. This should cover most panics that do not end in an `abort()` as well. There are
 /// some cases where panics can escape this, for example when one registers custom panic
-/// handlers.
+/// handlers. Guards do not prevent the explicit release of a `ThreadCell`. Deref a `Guard`
+/// referencing a released `ThreadCell` will panic!
+#[repr(transparent)]
 pub struct Guard<'a, T>(&'a ThreadCell<T>);
 
 impl<'a, T> Guard<'a, T> {
-    /// Creates a `Guard` that does not acquire the supplied `ThreadCell`.
-    pub const fn new(tc: &'a ThreadCell<T>) -> Self {
-        Self(tc)
-    }
-
     /// Acquires the supplied `ThreadCell` and creates a `Guard` referring to it.
     ///
     /// # Panics
@@ -450,26 +450,42 @@ impl<'a, T> Guard<'a, T> {
         tc.acquire();
         Self(tc)
     }
-}
 
-impl<T> Guard<'_, T> {
-    /// Returns a reference to the underlying `ThreadCell`.
-    #[inline]
-    pub fn inner(&self) -> &ThreadCell<T> {
-        self.0
+    /// Tries to acquire the supplied `ThreadCell` and creates a `Guard` referring to it. Will
+    /// return `None` when the acquisition failed.
+    pub fn try_acquire(tc: &'a ThreadCell<T>) -> Option<Self> {
+        if tc.try_acquire() {
+            Some(Self(tc))
+        } else {
+            None
+        }
     }
 }
 
 /// Releases the referenced `ThreadCell` when it is owned by the current thread.
 impl<T> Drop for Guard<'_, T> {
     fn drop(&mut self) {
-        self.inner().try_release();
+        self.0.try_release();
+    }
+}
+
+/// One can deref a `Guard` as long the `ThreadCell` is owned by the current thread this
+/// should be the case as long the guarded `ThreadCell` got not explicitly released or stolen.
+///
+/// # Panics
+///
+/// When the underlying `ThreadCell` is not owned by the current thread.
+impl<T> Deref for Guard<'_, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.get()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::*;
 
     #[test]
     fn smoke() {
@@ -494,15 +510,12 @@ mod tests {
     fn guard() {
         static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
 
-        let guard = Guard::new(&DISOWNED);
-
-        let _child = std::thread::spawn(|| {
-            let _guard = Guard::acquire(&DISOWNED);
+        std::thread::spawn(|| {
+            let guard = Guard::acquire(&DISOWNED);
+            assert_eq!(*guard, 234);
         })
         .join()
         .unwrap();
-
-        guard.inner().acquire();
     }
 
     #[test]
@@ -510,11 +523,27 @@ mod tests {
     fn guard_panic() {
         static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
 
-        let guard = Guard::new(&DISOWNED);
-        guard.inner().acquire();
+        let guard = Guard::acquire(&DISOWNED);
+        assert_eq!(*guard, 234);
 
-        let _child = std::thread::spawn(|| {
+        std::thread::spawn(|| {
             let _guard = Guard::acquire(&DISOWNED);
+        })
+        .join()
+        .unwrap();
+    }
+
+    #[test]
+    fn guard_drop() {
+        static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
+
+        let guard = Guard::acquire(&DISOWNED);
+        assert_eq!(*guard, 234);
+        drop(guard);
+
+        std::thread::spawn(|| {
+            let guard = Guard::acquire(&DISOWNED);
+            assert_eq!(*guard, 234);
         })
         .join()
         .unwrap();

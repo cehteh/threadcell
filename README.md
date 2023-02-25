@@ -22,8 +22,7 @@ variants in the API that will not panic but return a bool or Option instead.
 ## Guard
 
 `threadcell::Guard` is optional and (only) handle proper cleanup when it becomes
-dropped. Unlike MutexGuards they are explicitly constructed and may not hold the threads
-ownership of the referenced ThreadCell.
+dropped. Unlike MutexGuards they are explicitly constructed.
 
 # Use Cases
 
