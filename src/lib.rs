@@ -314,6 +314,7 @@ impl<T> ThreadCell<T> {
     // PLANNED: When specialization is available: 'fn is_sync<T>() -> bool' and debug_assert!(is_owned() || is_sync::<T>())
     #[inline]
     pub unsafe fn get_unchecked(&self) -> &T {
+        debug_assert!(self.is_owned(), "Thread has no access to ThreadCell");
         &self.data
     }
 
