@@ -499,6 +499,19 @@ impl ThreadId {
     }
 }
 
+#[test]
+fn threadid() {
+    let main = ThreadId::current().as_u64();
+    let child = std::thread::spawn(|| ThreadId::current().as_u64())
+        .join()
+        .unwrap();
+
+    // just info, actual values are unspecified
+    println!("{main}, {child}");
+
+    assert_ne!(main, child);
+}
+
 /// Guards that a referenced `ThreadCell` becomes properly released when its guard becomes
 /// dropped. This should cover most panics that do not end in an `abort()` as well. There are
 /// some cases where panics can escape this, for example when one registers custom panic
@@ -604,89 +617,5 @@ impl<T> Deref for GuardMut<'_, T> {
 impl<T> DerefMut for GuardMut<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.0.get_mut()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::*;
-
-    #[test]
-    fn smoke() {
-        let _owned = ThreadCell::new_owned(123);
-        let _disowned = ThreadCell::new_disowned(234);
-    }
-
-    #[test]
-    fn threadid() {
-        let main = ThreadId::current().as_u64();
-        let child = std::thread::spawn(|| ThreadId::current().as_u64())
-            .join()
-            .unwrap();
-
-        // just info, actual values are unspecified
-        println!("{main}, {child}");
-
-        assert_ne!(main, child);
-    }
-
-    #[test]
-    fn guard() {
-        static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
-
-        std::thread::spawn(|| {
-            let guard = Guard::acquire(&DISOWNED);
-            assert_eq!(*guard, 234);
-        })
-        .join()
-        .unwrap();
-    }
-
-    #[test]
-    #[should_panic]
-    fn guard_panic() {
-        static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
-
-        let guard = Guard::acquire(&DISOWNED);
-        assert_eq!(*guard, 234);
-
-        std::thread::spawn(|| {
-            let _guard = Guard::acquire(&DISOWNED);
-        })
-        .join()
-        .unwrap();
-    }
-
-    #[test]
-    fn guard_drop() {
-        static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
-
-        let guard = Guard::acquire(&DISOWNED);
-        assert_eq!(*guard, 234);
-        drop(guard);
-
-        std::thread::spawn(|| {
-            let guard = Guard::acquire(&DISOWNED);
-            assert_eq!(*guard, 234);
-        })
-        .join()
-        .unwrap();
-    }
-
-    #[test]
-    fn guard_mut() {
-        static mut DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
-
-        let mut guard = unsafe { GuardMut::acquire(&mut DISOWNED) };
-        assert_eq!(*guard, 234);
-        *guard = 345;
-        drop(guard);
-
-        std::thread::spawn(|| {
-            let guard = unsafe { Guard::acquire(&DISOWNED) };
-            assert_eq!(*guard, 345);
-        })
-        .join()
-        .unwrap();
     }
 }

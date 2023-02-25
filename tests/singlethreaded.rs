@@ -1,6 +1,12 @@
 use threadcell::ThreadCell;
 
 #[test]
+fn smoke() {
+    let _owned = ThreadCell::new_owned(123);
+    let _disowned = ThreadCell::new_disowned(234);
+}
+
+#[test]
 fn access_owned() {
     let owned = ThreadCell::new_owned(123);
     assert_eq!(*owned.get(), 123);
