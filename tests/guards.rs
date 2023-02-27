@@ -75,3 +75,12 @@ fn try_acquire_guard_mut() {
     *threadcell.try_acquire_guard_mut().expect("Some(Guard)") = 234;
     assert_eq!(*threadcell.acquire_get(), 234);
 }
+
+#[test]
+#[should_panic]
+fn two_guard_panic() {
+    let threadcell: ThreadCell<i32> = ThreadCell::default();
+
+    let _guard1 = threadcell.acquire_guard();
+    let _guard2 = threadcell.acquire_guard();
+}

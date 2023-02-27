@@ -41,23 +41,20 @@ impl<T> ThreadCell<T> {
         }
     }
 
-    /// Takes the ownership of a cell. This is a no-op when the cell is already owned by the
-    /// current thread.
+    /// Takes the ownership of a cell.
     ///
     /// # Panics
     ///
-    /// When the cell is owned by another thread.
+    /// When the cell is already owned by this thread or it is owned by another thread.
     pub fn acquire(&self) {
-        if !self.is_owned() {
-            self.thread_id
-                .compare_exchange(
-                    0,
-                    ThreadId::current().as_u64(),
-                    Ordering::Acquire,
-                    Ordering::Relaxed,
-                )
-                .expect("Thread has no access to ThreadCell");
-        }
+        self.thread_id
+            .compare_exchange(
+                0,
+                ThreadId::current().as_u64(),
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .expect("Thread can not acquire ThreadCell");
     }
 
     /// Tries to take the ownership of a cell. Returns true when the ownership could be
@@ -84,7 +81,9 @@ impl<T> ThreadCell<T> {
     ///
     /// When the cell is owned by another thread.
     pub fn acquire_get(&self) -> &T {
-        self.acquire();
+        if !self.is_owned() {
+            self.acquire();
+        }
         // Safety: we have it
         unsafe { self.get_unchecked() }
     }
@@ -106,7 +105,9 @@ impl<T> ThreadCell<T> {
     ///
     /// When the cell is owned by another thread.
     pub fn acquire_get_mut(&mut self) -> &mut T {
-        self.acquire();
+        if !self.is_owned() {
+            self.acquire();
+        }
         // Safety: we have it
         unsafe { self.get_mut_unchecked() }
     }
