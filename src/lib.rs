@@ -241,6 +241,9 @@ impl<T> ThreadCell<T> {
     /// Returns true when the current thread owns this cell.
     #[inline(always)]
     pub fn is_owned(&self) -> bool {
+        // This can be Relaxed because when we already own it, no other thread can change the
+        // ownership.  When we do not own it this may return Zero or some other thread id in a
+        // racy way, which is ok (to indicate disowned state) either way.
         self.thread_id.load(Ordering::Relaxed) == ThreadId::current().as_u64()
     }
 
