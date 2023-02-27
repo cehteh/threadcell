@@ -1,11 +1,11 @@
-use threadcell::{Guard, GuardMut, ThreadCell};
+use threadcell::ThreadCell;
 
 #[test]
 fn guard() {
     static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
 
     std::thread::spawn(|| {
-        let guard = Guard::acquire(&DISOWNED);
+        let guard = DISOWNED.acquire_guard();
         assert_eq!(*guard, 234);
     })
     .join()
@@ -17,11 +17,11 @@ fn guard() {
 fn guard_panic() {
     static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
 
-    let guard = Guard::acquire(&DISOWNED);
+    let guard = DISOWNED.acquire_guard();
     assert_eq!(*guard, 234);
 
     std::thread::spawn(|| {
-        let _guard = Guard::acquire(&DISOWNED);
+        let _guard = DISOWNED.acquire_guard();
     })
     .join()
     .unwrap();
@@ -31,12 +31,12 @@ fn guard_panic() {
 fn guard_drop() {
     static DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
 
-    let guard = Guard::acquire(&DISOWNED);
+    let guard = DISOWNED.acquire_guard();
     assert_eq!(*guard, 234);
     drop(guard);
 
     std::thread::spawn(|| {
-        let guard = Guard::acquire(&DISOWNED);
+        let guard = DISOWNED.acquire_guard();
         assert_eq!(*guard, 234);
     })
     .join()
@@ -47,13 +47,13 @@ fn guard_drop() {
 fn guard_mut() {
     static mut DISOWNED: ThreadCell<i32> = ThreadCell::new_disowned(234);
 
-    let mut guard = unsafe { GuardMut::acquire(&mut DISOWNED) };
+    let mut guard = unsafe { DISOWNED.acquire_guard_mut() };
     assert_eq!(*guard, 234);
     *guard = 345;
     drop(guard);
 
     std::thread::spawn(|| {
-        let guard = unsafe { Guard::acquire(&DISOWNED) };
+        let guard = unsafe { DISOWNED.acquire_guard() };
         assert_eq!(*guard, 345);
     })
     .join()

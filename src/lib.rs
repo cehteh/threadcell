@@ -520,10 +520,8 @@ fn threadid() {
 }
 
 /// Guards that a referenced `ThreadCell` becomes properly released when its guard becomes
-/// dropped. This should cover most panics that do not end in an `abort()` as well. There are
-/// some cases where panics can escape this, for example when one registers custom panic
-/// handlers. Guards do not prevent the explicit release of a `ThreadCell`. Deref a `Guard`
-/// referencing a released `ThreadCell` will panic!
+/// dropped. This covers releasing threadcells on panic.  Guards do not prevent the explicit
+/// release of a `ThreadCell`. Deref a `Guard` referencing a released `ThreadCell` will panic!
 #[repr(transparent)]
 pub struct Guard<'a, T>(&'a ThreadCell<T>);
 
@@ -533,14 +531,14 @@ impl<'a, T> Guard<'a, T> {
     /// # Panics
     ///
     /// When the cell is owned by another thread.
-    pub fn acquire(tc: &'a ThreadCell<T>) -> Self {
+    fn acquire(tc: &'a ThreadCell<T>) -> Self {
         tc.acquire();
         Self(tc)
     }
 
     /// Tries to acquire the supplied `ThreadCell` and creates a `Guard` referring to it. Will
     /// return `None` when the acquisition failed.
-    pub fn try_acquire(tc: &'a ThreadCell<T>) -> Option<Self> {
+    fn try_acquire(tc: &'a ThreadCell<T>) -> Option<Self> {
         if tc.try_acquire() {
             Some(Self(tc))
         } else {
@@ -571,10 +569,8 @@ impl<T> Deref for Guard<'_, T> {
 }
 
 /// Mutable Guard that ensures that a referenced `ThreadCell` becomes properly released when
-/// it becomes dropped. This should cover most panics that do not end in an `abort()` as
-/// well. There are some cases where panics can escape this, for example when one registers
-/// custom panic handlers. Guards do not prevent the explicit release of a `ThreadCell`. Deref
-/// a `GuardMut` referencing a released `ThreadCell` will panic!
+/// it becomes dropped.  Guards do not prevent the explicit release of a `ThreadCell`. Deref a
+/// `GuardMut` referencing a released `ThreadCell` will panic!
 #[repr(transparent)]
 pub struct GuardMut<'a, T>(&'a mut ThreadCell<T>);
 
@@ -584,14 +580,14 @@ impl<'a, T> GuardMut<'a, T> {
     /// # Panics
     ///
     /// When the cell is owned by another thread.
-    pub fn acquire(tc: &'a mut ThreadCell<T>) -> Self {
+    fn acquire(tc: &'a mut ThreadCell<T>) -> Self {
         tc.acquire();
         Self(tc)
     }
 
     /// Tries to acquire the supplied `ThreadCell` and creates a `GuardMut` referring to it. Will
     /// return `None` when the acquisition failed.
-    pub fn try_acquire(tc: &'a mut ThreadCell<T>) -> Option<Self> {
+    fn try_acquire(tc: &'a mut ThreadCell<T>) -> Option<Self> {
         if tc.try_acquire() {
             Some(Self(tc))
         } else {
