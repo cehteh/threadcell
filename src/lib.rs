@@ -61,21 +61,16 @@ impl<T> ThreadCell<T> {
     }
 
     /// Tries to take the ownership of a cell. Returns true when the ownership could be
-    /// obtained or the cell was already owned by the current thread and false when the cell
-    /// is owned by another thread.
+    /// obtained and false when the cell is already owned or owned by another thread.
     pub fn try_acquire(&self) -> bool {
-        if self.is_acquired() {
-            true
-        } else {
-            self.thread_id
-                .compare_exchange(
-                    0,
-                    ThreadId::current().as_u64(),
-                    Ordering::Acquire,
-                    Ordering::Relaxed,
-                )
-                .is_ok()
-        }
+        self.thread_id
+            .compare_exchange(
+                0,
+                ThreadId::current().as_u64(),
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .is_ok()
     }
 
     /// Takes the ownership of a cell and returns a reference to its value.
