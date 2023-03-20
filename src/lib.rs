@@ -61,8 +61,27 @@ impl<T> ThreadCell<T> {
     }
 
     /// Tries to take the ownership of a cell. Returns true when the ownership could be
-    /// obtained and false when the cell is already owned or owned by another thread.
+    /// obtained or the cell was already owned by the current thread and false when the cell
+    /// is owned by another thread.
     pub fn try_acquire(&self) -> bool {
+        if self.is_acquired() {
+            true
+        } else {
+            self.thread_id
+                .compare_exchange(
+                    0,
+                    ThreadId::current().as_u64(),
+                    Ordering::Acquire,
+                    Ordering::Relaxed,
+                )
+                .is_ok()
+        }
+    }
+
+    /// Tries to take the ownership of a cell. Returns true when the ownership could be
+    /// obtained and false when the cell is already owned or owned by another thread.
+    /// Note that this fails when the cell is already owned (unlike `try_acquire()`).
+    pub fn try_acquire_once(&self) -> bool {
         self.thread_id
             .compare_exchange(
                 0,
@@ -299,28 +318,28 @@ impl<T> ThreadCell<T> {
     /// Returns true when the current thread owns this cell.
     #[inline(always)]
     pub fn is_owned(&self) -> bool {
-        // This can be Relaxed because when we already own it, no other thread can change the
-        // ownership.  When we do not own it this may return Zero or some other thread id in a
-        // racy way, which is ok (to indicate disowned state) either way.
-        self.thread_id.load(Ordering::Acquire) & !GUARD_BIT == ThreadId::current().as_u64()
+        // This can be Relaxed because when we already own it (with Acquire), no other thread
+        // can change the ownership.  When we do not own it this may return Zero or some other
+        // thread id in a racy way, which is ok (to indicate disowned state) either way.
+        self.thread_id.load(Ordering::Relaxed) & !GUARD_BIT == ThreadId::current().as_u64()
     }
 
     /// Returns true when the current thread owns this cell by acquire.
     #[inline(always)]
     pub fn is_acquired(&self) -> bool {
-        // This can be Relaxed because when we already own it, no other thread can change the
-        // ownership.  When we do not own it this may return Zero or some other thread id in a
-        // racy way, which is ok (to indicate disowned state) either way.
-        self.thread_id.load(Ordering::Acquire) == ThreadId::current().as_u64()
+        // This can be Relaxed because when we already own it (with Acquire), no other thread
+        // can change the ownership.  When we do not own it this may return Zero or some other
+        // thread id in a racy way, which is ok (to indicate disowned state) either way.
+        self.thread_id.load(Ordering::Relaxed) == ThreadId::current().as_u64()
     }
 
     /// Returns true when the current thread holds a guard on this cell.
     #[inline(always)]
     pub fn is_guarded(&self) -> bool {
-        // This can be Relaxed because when we already own it, no other thread can change the
-        // ownership.  When we do not own it this may return Zero or some other thread id in a
-        // racy way, which is ok (to indicate disowned state) either way.
-        self.thread_id.load(Ordering::Acquire) == ThreadId::current().as_u64() | GUARD_BIT
+        // This can be Relaxed because when we already own it (with Acquire), no other thread
+        // can change the ownership.  When we do not own it this may return Zero or some other
+        // thread id in a racy way, which is ok (to indicate disowned state) either way.
+        self.thread_id.load(Ordering::Relaxed) == ThreadId::current().as_u64() | GUARD_BIT
     }
 
     #[inline]
