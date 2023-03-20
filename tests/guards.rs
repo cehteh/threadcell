@@ -62,7 +62,7 @@ fn guard_mut() {
 
 #[test]
 fn try_acquire_guard() {
-    let threadcell: ThreadCell<i32> = ThreadCell::default();
+    let threadcell: ThreadCell<i32> = ThreadCell::new_disowned(0);
 
     let guard = threadcell.try_acquire_guard().expect("Some(Guard)");
     assert_eq!(*guard, i32::default());
@@ -70,7 +70,7 @@ fn try_acquire_guard() {
 
 #[test]
 fn try_acquire_guard_mut() {
-    let mut threadcell: ThreadCell<i32> = ThreadCell::default();
+    let mut threadcell: ThreadCell<i32> = ThreadCell::new_disowned(0);
 
     *threadcell.try_acquire_guard_mut().expect("Some(Guard)") = 234;
     assert_eq!(*threadcell.acquire_get(), 234);
@@ -79,8 +79,37 @@ fn try_acquire_guard_mut() {
 #[test]
 #[should_panic]
 fn two_guard_panic() {
-    let threadcell: ThreadCell<i32> = ThreadCell::default();
+    let threadcell: ThreadCell<i32> = ThreadCell::new_disowned(0);
 
     let _guard1 = threadcell.acquire_guard();
     let _guard2 = threadcell.acquire_guard();
+}
+
+#[test]
+fn no_guard_after_acquire() {
+    let threadcell: ThreadCell<i32> = ThreadCell::new_disowned(0);
+
+    threadcell.try_acquire();
+    assert!(threadcell.is_acquired());
+    assert!(!threadcell.is_guarded());
+    assert!(threadcell.try_acquire_guard().is_none());
+}
+
+#[test]
+fn no_acquire_after_guard() {
+    let threadcell: ThreadCell<i32> = ThreadCell::new_disowned(0);
+
+    let _guard = threadcell.try_acquire_guard().expect("Some(Guard)");
+    assert!(threadcell.is_guarded());
+    assert!(!threadcell.try_acquire());
+}
+
+#[test]
+#[should_panic]
+fn cant_release_guarded() {
+    let threadcell: ThreadCell<i32> = ThreadCell::new_disowned(0);
+
+    let _guard = threadcell.try_acquire_guard().expect("Some(Guard)");
+    assert!(threadcell.is_guarded());
+    threadcell.release();
 }

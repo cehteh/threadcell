@@ -19,6 +19,9 @@ pub struct ThreadCell<T> {
     thread_id: AtomicU64,
 }
 
+// We use the highest bit of a thread id to indicate that we hold a guard
+const GUARD_BIT: u64 = i64::MAX as u64 + 1;
+
 #[allow(clippy::non_send_fields_in_send_ty)]
 unsafe impl<T: Send> Send for ThreadCell<T> {}
 unsafe impl<T: Send> Sync for ThreadCell<T> {}
@@ -61,7 +64,7 @@ impl<T> ThreadCell<T> {
     /// obtained or the cell was already owned by the current thread and false when the cell
     /// is owned by another thread.
     pub fn try_acquire(&self) -> bool {
-        if self.is_owned() {
+        if self.is_acquired() {
             true
         } else {
             self.thread_id
@@ -130,14 +133,36 @@ impl<T> ThreadCell<T> {
     /// When the cell is owned by another thread.
     #[inline]
     pub fn acquire_guard(&self) -> Guard<T> {
-        Guard::acquire(self)
+        self.thread_id
+            .compare_exchange(
+                0,
+                ThreadId::current().as_u64() | GUARD_BIT,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .expect("Thread can not acquire ThreadCell");
+        Guard(self)
     }
 
     /// Acquires a `ThreadCell` returning a `Option<Guard>` that releases it when becoming
     /// dropped.  Returns `None` when self is owned by another thread.
     #[inline]
+    #[mutants::skip]
     pub fn try_acquire_guard(&self) -> Option<Guard<T>> {
-        Guard::try_acquire(self)
+        if self
+            .thread_id
+            .compare_exchange(
+                0,
+                ThreadId::current().as_u64() | GUARD_BIT,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .is_ok()
+        {
+            Some(Guard(self))
+        } else {
+            None
+        }
     }
 
     /// Acquires a `ThreadCell` returning a `GuardMut` that releases it when becoming dropped.
@@ -147,21 +172,42 @@ impl<T> ThreadCell<T> {
     /// When the cell is owned by another thread.
     #[inline]
     pub fn acquire_guard_mut(&mut self) -> GuardMut<T> {
-        GuardMut::acquire(self)
+        self.thread_id
+            .compare_exchange(
+                0,
+                ThreadId::current().as_u64() | GUARD_BIT,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .expect("Thread can not acquire ThreadCell");
+        GuardMut(self)
     }
 
     /// Acquires a `ThreadCell` returning a `Option<GuardMut>` that releases it when becoming
     /// dropped.  Returns `None` when self is owned by another thread.
     #[inline]
     pub fn try_acquire_guard_mut(&mut self) -> Option<GuardMut<T>> {
-        GuardMut::try_acquire(self)
+        if self
+            .thread_id
+            .compare_exchange(
+                0,
+                ThreadId::current().as_u64() | GUARD_BIT,
+                Ordering::Acquire,
+                Ordering::Relaxed,
+            )
+            .is_ok()
+        {
+            Some(GuardMut(self))
+        } else {
+            None
+        }
     }
 
     /// Runs a closure on a `ThreadCell` with acquire/release.
     ///
     /// # Panics
     ///
-    /// When the cell is owned by another thread.
+    /// When the cell is already owned by the current thread or is owned by another thread.
     pub fn with<R, F: FnOnce(&T) -> R>(&self, f: F) -> R {
         f(&*self.acquire_guard())
     }
@@ -170,7 +216,7 @@ impl<T> ThreadCell<T> {
     ///
     /// # Panics
     ///
-    /// When the cell is owned by another thread.
+    /// When the cell is already owned by the current thread or is owned by another thread.
     pub fn with_mut<R, F: FnOnce(&mut T) -> R>(&mut self, f: F) -> R {
         f(&mut *self.acquire_guard_mut())
     }
@@ -224,6 +270,13 @@ impl<T> ThreadCell<T> {
             .expect("Thread has no access to ThreadCell");
     }
 
+    /// Unsafe as it doesn't check for ownership.
+    #[mutants::skip]
+    unsafe fn release_unchecked(&self) {
+        debug_assert!(self.is_owned());
+        self.thread_id.store(0, Ordering::Release);
+    }
+
     /// Tries to set a `ThreadCell` which is owned by the current thread into the disowned
     /// state. Returns *true* on success and *false* when the current thread does not own the
     /// cell.
@@ -244,7 +297,25 @@ impl<T> ThreadCell<T> {
         // This can be Relaxed because when we already own it, no other thread can change the
         // ownership.  When we do not own it this may return Zero or some other thread id in a
         // racy way, which is ok (to indicate disowned state) either way.
-        self.thread_id.load(Ordering::Relaxed) == ThreadId::current().as_u64()
+        self.thread_id.load(Ordering::Acquire) & !GUARD_BIT == ThreadId::current().as_u64()
+    }
+
+    /// Returns true when the current thread owns this cell by acquire.
+    #[inline(always)]
+    pub fn is_acquired(&self) -> bool {
+        // This can be Relaxed because when we already own it, no other thread can change the
+        // ownership.  When we do not own it this may return Zero or some other thread id in a
+        // racy way, which is ok (to indicate disowned state) either way.
+        self.thread_id.load(Ordering::Acquire) == ThreadId::current().as_u64()
+    }
+
+    /// Returns true when the current thread holds a guard on this cell.
+    #[inline(always)]
+    pub fn is_guarded(&self) -> bool {
+        // This can be Relaxed because when we already own it, no other thread can change the
+        // ownership.  When we do not own it this may return Zero or some other thread id in a
+        // racy way, which is ok (to indicate disowned state) either way.
+        self.thread_id.load(Ordering::Acquire) == ThreadId::current().as_u64() | GUARD_BIT
     }
 
     #[inline]
@@ -347,7 +418,7 @@ impl<T> Drop for ThreadCell<T> {
     // need dropping would still be a violation.
     #[cfg(debug_assertions)]
     fn drop(&mut self) {
-        let owner = self.thread_id.load(Ordering::Relaxed);
+        let owner = self.thread_id.load(Ordering::Acquire) & !GUARD_BIT;
         if owner == 0 || owner == ThreadId::current().as_u64() {
             if mem::needs_drop::<T>() {
                 unsafe { ManuallyDrop::drop(&mut self.data) };
@@ -363,7 +434,7 @@ impl<T> Drop for ThreadCell<T> {
     #[cfg(not(debug_assertions))]
     fn drop(&mut self) {
         if mem::needs_drop::<T>() {
-            let owner = self.thread_id.load(Ordering::Relaxed);
+            let owner = self.thread_id.load(Ordering::Acquire) & !GUARD_BIT;
             if owner == 0 || owner == ThreadId::current().as_u64() {
                 unsafe { ManuallyDrop::drop(&mut self.data) };
             } else {
@@ -497,7 +568,11 @@ impl ThreadId {
     fn current() -> ThreadId {
         thread_local!(static THREAD_ID: NonZeroU64 = {
             static COUNTER: AtomicU64 = AtomicU64::new(1);
-            NonZeroU64::new(COUNTER.fetch_add(1, Ordering::SeqCst)).expect("more than u64::MAX threads")
+            {
+                let id = NonZeroU64::new(COUNTER.fetch_add(1, Ordering::Relaxed)).unwrap();
+                assert!(id.get() <= i64::MAX as u64, "more than i64::MAX threads");
+                id
+            }
         });
         THREAD_ID.with(|&x| ThreadId(x))
     }
@@ -528,32 +603,14 @@ fn threadid() {
 #[repr(transparent)]
 pub struct Guard<'a, T>(&'a ThreadCell<T>);
 
-impl<'a, T> Guard<'a, T> {
-    /// Acquires the supplied `ThreadCell` and creates a `Guard` referring to it.
-    ///
-    /// # Panics
-    ///
-    /// When the cell is owned by another thread.
-    fn acquire(tc: &'a ThreadCell<T>) -> Self {
-        tc.acquire();
-        Self(tc)
-    }
-
-    /// Tries to acquire the supplied `ThreadCell` and creates a `Guard` referring to it. Will
-    /// return `None` when the acquisition failed.
-    fn try_acquire(tc: &'a ThreadCell<T>) -> Option<Self> {
-        if tc.try_acquire() {
-            Some(Self(tc))
-        } else {
-            None
-        }
-    }
-}
-
 /// Releases the referenced `ThreadCell` when it is owned by the current thread.
 impl<T> Drop for Guard<'_, T> {
+    #[mutants::skip]
     fn drop(&mut self) {
-        self.0.try_release();
+        unsafe {
+            // SAFETY: a guard is guaranteed to own the cell
+            self.0.release_unchecked();
+        }
     }
 }
 
@@ -577,32 +634,13 @@ impl<T> Deref for Guard<'_, T> {
 #[repr(transparent)]
 pub struct GuardMut<'a, T>(&'a mut ThreadCell<T>);
 
-impl<'a, T> GuardMut<'a, T> {
-    /// Acquires the supplied `ThreadCell` and creates a `GuardMut` referring to it.
-    ///
-    /// # Panics
-    ///
-    /// When the cell is owned by another thread.
-    fn acquire(tc: &'a mut ThreadCell<T>) -> Self {
-        tc.acquire();
-        Self(tc)
-    }
-
-    /// Tries to acquire the supplied `ThreadCell` and creates a `GuardMut` referring to it. Will
-    /// return `None` when the acquisition failed.
-    fn try_acquire(tc: &'a mut ThreadCell<T>) -> Option<Self> {
-        if tc.try_acquire() {
-            Some(Self(tc))
-        } else {
-            None
-        }
-    }
-}
-
 /// Releases the referenced `ThreadCell` when it is owned by the current thread.
 impl<T> Drop for GuardMut<'_, T> {
     fn drop(&mut self) {
-        self.0.try_release();
+        unsafe {
+            // SAFETY: a guard is guaranteed to own the cell
+            self.0.release_unchecked();
+        }
     }
 }
 

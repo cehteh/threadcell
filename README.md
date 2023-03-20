@@ -20,16 +20,28 @@ Threads that do not own a ThreadCell and access its value will panic.  There are
 variants in the API that will not panic but return a bool or Option instead.
 
 
-## Guard
+## Api
 
-`threadcell::Guard` and `threadcell::GuardMut` are optional and handle proper acquire/release
-for thradcells. There can be only one guard active per threadcell.
+There are two variants how Threadcells can be used. From 'v0.11' on these are mutually
+exclusive.
+
+
+### Acquire/Release
+
+Offers manual control over a `ThreadCell` ownership. The disadvantage here is that when a
+thread holding a `ThreadCell` will panic, this cell stays owned by the dead thread. One either
+needs to discover these cases and then `steal()` the cell or use that only in cases where
+panics are impossible or aborting the whole process. This API can be used to implement custom
+guard types as well.
+
+
+### Guard
+
+`threadcell::Guard` and `threadcell::GuardMut` are handle proper acquire/release for
+threadcells. There can be only one guard active per threadcell. As long a thread has a `Guard`
+the threadcell is owned by that thread and will be released when the `Guard` becomes dropped.
 
 Guards implement `Deref` and `DerefMut` making accessing threadcells more ergonomic.
-
-A side effect of being optional is that becomes possible to explicitly release a `ThreadCell`
-while it still has a active guard. Dereferencing such a Guard will panic then. Thus care
-should be taken than threadcells are either managed by guards or manually managed.
 
 
 # Use Cases

@@ -75,3 +75,10 @@ fn try_acquire_get_mut() {
     *threadcell.try_acquire_get_mut().expect("Acquired") = 345;
     assert_eq!(*threadcell.get(), 345);
 }
+
+#[test]
+fn try_release() {
+    let threadcell = ThreadCell::new_owned(234);
+    assert!(threadcell.try_release());
+    assert!(!threadcell.try_release());
+}

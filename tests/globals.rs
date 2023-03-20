@@ -21,3 +21,30 @@ fn access_mut_global() {
         assert_eq!(*MUT_GLOBAL.get(), 456);
     }
 }
+
+static MUT_GLOBAL2: ThreadCell<RefCell<u64>> = ThreadCell::new_disowned(RefCell::new(123));
+
+#[test]
+fn concurrent_mut_global() {
+    let thread = std::thread::spawn(|| loop {
+        if let Some(guard) = MUT_GLOBAL2.try_acquire_guard() {
+            let cell = guard.borrow();
+            if *cell == 345 {
+                return;
+            }
+        }
+    });
+
+    loop {
+        if let Some(guard) = MUT_GLOBAL2.try_acquire_guard() {
+            let mut cell = guard.borrow_mut();
+            if *cell == 345 {
+                break;
+            } else {
+                *cell = 345;
+            }
+        }
+    }
+
+    thread.join().unwrap();
+}
