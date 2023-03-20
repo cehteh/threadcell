@@ -13,6 +13,14 @@ fn access_owned() {
 }
 
 #[test]
+fn is_acquired() {
+    let owned = ThreadCell::new_disowned(123);
+    assert!(!owned.is_acquired());
+    owned.acquire();
+    assert!(owned.is_acquired());
+}
+
+#[test]
 #[should_panic]
 fn access_disowned() {
     let disowned = ThreadCell::new_disowned(234);

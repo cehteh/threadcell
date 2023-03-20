@@ -246,11 +246,21 @@ impl<T> ThreadCell<T> {
     /// only safe way to use this method is to recover a cell that is owned by a thread that
     /// finished without releasing it (e.g after a panic). Attention should be paid to the
     /// fact that the value protected by the `ThreadCell` might be in a undefined state.
+    ///
+    /// # Panics
+    ///
+    /// The `ThreadCell` has a `Guard` on it. `steal()` can only be used with acquire/release
+    /// semantics.
     pub unsafe fn steal(&self) -> &Self {
-        if !self.is_owned() {
+        if !self.is_acquired() {
+            assert!(
+                self.thread_id.load(Ordering::Acquire) & GUARD_BIT == 0,
+                "Can't steal guarded ThreadCell"
+            );
             self.thread_id
                 .store(ThreadId::current().as_u64(), Ordering::SeqCst);
         }
+
         self
     }
 
