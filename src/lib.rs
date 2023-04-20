@@ -324,6 +324,15 @@ impl<T> ThreadCell<T> {
         self.thread_id.load(Ordering::Relaxed) & !GUARD_BIT == ThreadId::current().as_u64()
     }
 
+    /// Returns true when this `ThreadCell` is not owned by any thread. As this can change at
+    /// any time by another taking ownership of this `ThreadCell` the result of this function
+    /// may be **inexact and racy**. Use this only when only a hint is required or access to the
+    /// `ThreadCell` is synchronized by some other means.
+    #[inline(always)]
+    pub fn is_disowned(&self) -> bool {
+        self.thread_id.load(Ordering::Acquire) == 0
+    }
+
     /// Returns true when the current thread owns this cell by acquire.
     #[inline(always)]
     pub fn is_acquired(&self) -> bool {
