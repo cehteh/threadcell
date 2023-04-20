@@ -98,3 +98,11 @@ fn try_release() {
     assert!(threadcell.try_release());
     assert!(!threadcell.try_release());
 }
+
+#[test]
+fn is_disowned() {
+    let threadcell = ThreadCell::new_disowned(234);
+    assert!(threadcell.is_disowned());
+    threadcell.acquire();
+    assert!(!threadcell.is_disowned());
+}
