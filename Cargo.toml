@@ -9,5 +9,15 @@ repository = "https://github.com/cehteh/threadcell.git"
 keywords = ["cell", "global", "static", "cooperative"]
 categories = ["concurrency"]
 
+[features]
+default = []
+
+# unstable features from nightly, probed with conf_test
+nightly_thread_id_value  = []
+
 [dependencies]
 mutants = "0.0.3"
+
+[build-dependencies]
+conf_test = "0.3"
+

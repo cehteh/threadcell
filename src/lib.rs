@@ -6,6 +6,7 @@
 #![warn(clippy::semicolon_if_nothing_returned)]
 #![warn(missing_docs)]
 #![warn(rustdoc::missing_crate_level_docs)]
+#![cfg_attr(feature = "nightly_thread_id_value", feature(thread_id_value))]
 
 use std::mem::ManuallyDrop;
 use std::num::NonZeroU64;
