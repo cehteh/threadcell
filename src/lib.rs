@@ -9,7 +9,6 @@
 #![cfg_attr(feature = "nightly_thread_id_value", feature(thread_id_value))]
 
 use std::mem::ManuallyDrop;
-use std::num::NonZeroU64;
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{cmp, fmt, mem};
@@ -41,7 +40,7 @@ impl<T> ThreadCell<T> {
     pub fn new_owned(data: T) -> Self {
         Self {
             data: ManuallyDrop::new(data),
-            thread_id: AtomicU64::new(ThreadId::current().as_u64()),
+            thread_id: AtomicU64::new(current_thread_id()),
         }
     }
 
@@ -52,12 +51,7 @@ impl<T> ThreadCell<T> {
     /// When the cell is already owned by this thread or it is owned by another thread.
     pub fn acquire(&self) {
         self.thread_id
-            .compare_exchange(
-                0,
-                ThreadId::current().as_u64(),
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            )
+            .compare_exchange(0, current_thread_id(), Ordering::Acquire, Ordering::Relaxed)
             .expect("Thread can not acquire ThreadCell");
     }
 
@@ -69,12 +63,7 @@ impl<T> ThreadCell<T> {
             true
         } else {
             self.thread_id
-                .compare_exchange(
-                    0,
-                    ThreadId::current().as_u64(),
-                    Ordering::Acquire,
-                    Ordering::Relaxed,
-                )
+                .compare_exchange(0, current_thread_id(), Ordering::Acquire, Ordering::Relaxed)
                 .is_ok()
         }
     }
@@ -84,12 +73,7 @@ impl<T> ThreadCell<T> {
     /// Note that this fails when the cell is already owned (unlike `try_acquire()`).
     pub fn try_acquire_once(&self) -> bool {
         self.thread_id
-            .compare_exchange(
-                0,
-                ThreadId::current().as_u64(),
-                Ordering::Acquire,
-                Ordering::Relaxed,
-            )
+            .compare_exchange(0, current_thread_id(), Ordering::Acquire, Ordering::Relaxed)
             .is_ok()
     }
 
@@ -151,7 +135,7 @@ impl<T> ThreadCell<T> {
         self.thread_id
             .compare_exchange(
                 0,
-                ThreadId::current().as_u64() | GUARD_BIT,
+                current_thread_id() | GUARD_BIT,
                 Ordering::Acquire,
                 Ordering::Relaxed,
             )
@@ -168,7 +152,7 @@ impl<T> ThreadCell<T> {
             .thread_id
             .compare_exchange(
                 0,
-                ThreadId::current().as_u64() | GUARD_BIT,
+                current_thread_id() | GUARD_BIT,
                 Ordering::Acquire,
                 Ordering::Relaxed,
             )
@@ -190,7 +174,7 @@ impl<T> ThreadCell<T> {
         self.thread_id
             .compare_exchange(
                 0,
-                ThreadId::current().as_u64() | GUARD_BIT,
+                current_thread_id() | GUARD_BIT,
                 Ordering::Acquire,
                 Ordering::Relaxed,
             )
@@ -206,7 +190,7 @@ impl<T> ThreadCell<T> {
             .thread_id
             .compare_exchange(
                 0,
-                ThreadId::current().as_u64() | GUARD_BIT,
+                current_thread_id() | GUARD_BIT,
                 Ordering::Acquire,
                 Ordering::Relaxed,
             )
@@ -272,8 +256,7 @@ impl<T> ThreadCell<T> {
                 self.thread_id.load(Ordering::Acquire) & GUARD_BIT == 0,
                 "Can't steal guarded ThreadCell"
             );
-            self.thread_id
-                .store(ThreadId::current().as_u64(), Ordering::SeqCst);
+            self.thread_id.store(current_thread_id(), Ordering::SeqCst);
         }
 
         self
@@ -286,12 +269,7 @@ impl<T> ThreadCell<T> {
     /// The current thread does not own the cell.
     pub fn release(&self) {
         self.thread_id
-            .compare_exchange(
-                ThreadId::current().as_u64(),
-                0,
-                Ordering::Release,
-                Ordering::Relaxed,
-            )
+            .compare_exchange(current_thread_id(), 0, Ordering::Release, Ordering::Relaxed)
             .expect("Thread has no access to ThreadCell");
     }
 
@@ -307,12 +285,7 @@ impl<T> ThreadCell<T> {
     /// cell.
     pub fn try_release(&self) -> bool {
         self.thread_id
-            .compare_exchange(
-                ThreadId::current().as_u64(),
-                0,
-                Ordering::Release,
-                Ordering::Relaxed,
-            )
+            .compare_exchange(current_thread_id(), 0, Ordering::Release, Ordering::Relaxed)
             .is_ok()
     }
 
@@ -322,7 +295,7 @@ impl<T> ThreadCell<T> {
         // This can be Relaxed because when we already own it (with Acquire), no other thread
         // can change the ownership.  When we do not own it this may return Zero or some other
         // thread id in a racy way, which is ok (to indicate disowned state) either way.
-        self.thread_id.load(Ordering::Relaxed) & !GUARD_BIT == ThreadId::current().as_u64()
+        self.thread_id.load(Ordering::Relaxed) & !GUARD_BIT == current_thread_id()
     }
 
     /// Returns true when this `ThreadCell` is not owned by any thread. As this can change at
@@ -340,7 +313,7 @@ impl<T> ThreadCell<T> {
         // This can be Relaxed because when we already own it (with Acquire), no other thread
         // can change the ownership.  When we do not own it this may return Zero or some other
         // thread id in a racy way, which is ok (to indicate disowned state) either way.
-        self.thread_id.load(Ordering::Relaxed) == ThreadId::current().as_u64()
+        self.thread_id.load(Ordering::Relaxed) == current_thread_id()
     }
 
     /// Returns true when the current thread holds a guard on this cell.
@@ -349,7 +322,7 @@ impl<T> ThreadCell<T> {
         // This can be Relaxed because when we already own it (with Acquire), no other thread
         // can change the ownership.  When we do not own it this may return Zero or some other
         // thread id in a racy way, which is ok (to indicate disowned state) either way.
-        self.thread_id.load(Ordering::Relaxed) == ThreadId::current().as_u64() | GUARD_BIT
+        self.thread_id.load(Ordering::Relaxed) == current_thread_id() | GUARD_BIT
     }
 
     #[inline]
@@ -453,7 +426,7 @@ impl<T> Drop for ThreadCell<T> {
     #[cfg(debug_assertions)]
     fn drop(&mut self) {
         let owner = self.thread_id.load(Ordering::Acquire) & !GUARD_BIT;
-        if owner == 0 || owner == ThreadId::current().as_u64() {
+        if owner == 0 || owner == current_thread_id() {
             if mem::needs_drop::<T>() {
                 unsafe { ManuallyDrop::drop(&mut self.data) };
             }
@@ -469,7 +442,7 @@ impl<T> Drop for ThreadCell<T> {
     fn drop(&mut self) {
         if mem::needs_drop::<T>() {
             let owner = self.thread_id.load(Ordering::Acquire) & !GUARD_BIT;
-            if owner == 0 || owner == ThreadId::current().as_u64() {
+            if owner == 0 || owner == current_thread_id() {
                 unsafe { ManuallyDrop::drop(&mut self.data) };
             } else {
                 panic!("Thread has no access to ThreadCell");
@@ -592,13 +565,18 @@ impl<T: fmt::Debug> fmt::Debug for ThreadCell<T> {
     }
 }
 
+#[cfg(not(feature = "nightly_thread_id_value"))]
+use std::num::NonZeroU64;
+
 /// A unique identifier for every thread.
+#[cfg(not(feature = "nightly_thread_id_value"))]
 struct ThreadId(NonZeroU64);
 
-// PLANNED: nightly impl (std::thread::ThreadId)
+#[cfg(not(feature = "nightly_thread_id_value"))]
 impl ThreadId {
     #[inline]
     #[must_use]
+    #[mutants::skip]
     fn current() -> ThreadId {
         thread_local!(static THREAD_ID: NonZeroU64 = {
             static COUNTER: AtomicU64 = AtomicU64::new(1);
@@ -613,22 +591,39 @@ impl ThreadId {
 
     #[inline(always)]
     #[must_use]
-    fn as_u64(&self) -> u64 {
-        self.0.get()
+    #[mutants::skip]
+    fn as_u64(&self) -> NonZeroU64 {
+        self.0
     }
 }
 
 #[test]
+#[cfg(not(feature = "nightly_thread_id_value"))]
 fn threadid() {
-    let main = ThreadId::current().as_u64();
-    let child = std::thread::spawn(|| ThreadId::current().as_u64())
+    let main = ThreadId::current().as_u64().get();
+    let child = std::thread::spawn(|| ThreadId::current().as_u64().get())
         .join()
         .unwrap();
 
     // just info, actual values are unspecified
     println!("{main}, {child}");
 
+    assert_ne!(main, 0);
     assert_ne!(main, child);
+}
+
+#[cfg(not(feature = "nightly_thread_id_value"))]
+#[mutants::skip]
+#[inline]
+fn current_thread_id() -> u64 {
+    ThreadId::current().as_u64().get()
+}
+
+#[cfg(feature = "nightly_thread_id_value")]
+#[mutants::skip]
+#[inline]
+fn current_thread_id() -> u64 {
+    std::thread::current().id().as_u64().get()
 }
 
 /// Guards that a referenced `ThreadCell` becomes properly released when its guard becomes
