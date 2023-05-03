@@ -1,6 +1,6 @@
 [package]
 name = "threadcell"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["Christian Thäter <ct@pipapo.org>"]
 description = "A cell whose value can only be accessed by a owning thread"
@@ -19,5 +19,5 @@ nightly_thread_id_value  = []
 mutants = "0.0.3"
 
 [build-dependencies]
-conf_test = "0.3"
+conf_test = "0.4"
 
