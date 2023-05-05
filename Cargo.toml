@@ -1,6 +1,6 @@
 [package]
 name = "threadcell"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 authors = ["Christian Thäter <ct@pipapo.org>"]
 description = "A cell whose value can only be accessed by a owning thread"
@@ -12,12 +12,12 @@ categories = ["concurrency"]
 [features]
 default = []
 
-# unstable features from nightly, probed with conf_test
+# enable to use nightly features
+nightly = ["nightly_thread_id_value"]
+
+# unstable features from nightly
 nightly_thread_id_value  = []
 
 [dependencies]
 mutants = "0.0.3"
-
-[build-dependencies]
-conf_test = "0.5"
 
