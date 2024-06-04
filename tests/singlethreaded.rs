@@ -45,7 +45,7 @@ fn mutate_owned() {
 #[test]
 fn release() {
     let threadcell = ThreadCell::new_owned(());
-    threadcell.release();
+    unsafe {threadcell.release()};
     assert!(!threadcell.is_owned());
 }
 

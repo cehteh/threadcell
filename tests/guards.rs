@@ -111,5 +111,5 @@ fn cant_release_guarded() {
 
     let _guard = threadcell.try_acquire_guard().expect("Some(Guard)");
     assert!(threadcell.is_guarded());
-    threadcell.release();
+    unsafe { threadcell.release() };
 }

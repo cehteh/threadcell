@@ -264,10 +264,14 @@ impl<T> ThreadCell<T> {
 
     /// Sets a `ThreadCell` which is owned by the current thread into the disowned state.
     ///
+    /// # Safety
+    ///
+    /// The current thread must not use any references it has to the cell after releasing it.
+    ///
     /// # Panics
     ///
     /// The current thread does not own the cell.
-    pub fn release(&self) {
+    pub unsafe fn release(&self) {
         self.thread_id
             .compare_exchange(current_thread_id(), 0, Ordering::Release, Ordering::Relaxed)
             .expect("Thread has no access to ThreadCell");
